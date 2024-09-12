@@ -1,8 +1,8 @@
 import { Request, Response } from 'express';
 import { AuthRepository } from '../../domain/repositories';
 import { CustomError } from '../../domain/errors';
-import { RegisterUserDto } from '../../domain/auth';
-import { RegisterUser } from '../../domain/use-cases/auth';
+import { LoginUserDto, RegisterUserDto } from '../../domain/auth';
+import { LoginUser, RegisterUser } from '../../domain/use-cases/auth';
 import { UserModel } from '../../data/mongodb/models/user.model';
 
 export class AuthController {
@@ -23,17 +23,27 @@ export class AuthController {
         return this.handleError(CustomError.BadRequest(error), res);
       }
 
-      const data = await new RegisterUser(this.authRepository).execute(
-        registerUserDto!,
-      );
+      const registerUseCase = new RegisterUser(this.authRepository);
+      const data = await registerUseCase.execute(registerUserDto!);
       return res.json(data);
     } catch (error) {
       return this.handleError(error, res);
     }
   };
 
-  loginUser = (req: Request, res: Response): Response => {
-    return res.json('Login route controller');
+  loginUser = async (req: Request, res: Response): Promise<Response> => {
+    try {
+      const [error, loginUserDto] = LoginUserDto.create(req.body);
+      if (error) {
+        return this.handleError(CustomError.BadRequest(error), res);
+      }
+
+      const loginUseCase = new LoginUser(this.authRepository);
+      const data = await loginUseCase.execute(loginUserDto!);
+      return res.json(data);
+    } catch (error) {
+      return this.handleError(error, res);
+    }
   };
 
   getUser = (req: Request, res: Response) => {

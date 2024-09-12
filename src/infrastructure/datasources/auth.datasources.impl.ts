@@ -1,12 +1,10 @@
-
 import { BcryptAdapter } from '../../config';
 import { UserModel } from '../../data/mongodb/models';
-import { RegisterUserDto } from '../../domain/auth';
+import { LoginUserDto, RegisterUserDto } from '../../domain/auth';
 import { AuthDatasource } from '../../domain/datasources';
 import { UserEntity } from '../../domain/entities';
 import { CustomError } from '../../domain/errors';
 import { UserMapper } from '../mappers';
-
 
 type HashFunction = (password: string) => string;
 type compareFunction = (password: string, hashedPassword: string) => boolean;
@@ -14,7 +12,7 @@ type compareFunction = (password: string, hashedPassword: string) => boolean;
 export class AuthDatasourcesImpl implements AuthDatasource {
   constructor(
     private readonly hashPassword: HashFunction = BcryptAdapter.hash,
-    private readonly comparePassword: compareFunction = BcryptAdapter.compare
+    private readonly comparePassword: compareFunction = BcryptAdapter.compare,
   ) {}
 
   async register(registerUserDto: RegisterUserDto): Promise<UserEntity> {
@@ -32,6 +30,29 @@ export class AuthDatasourcesImpl implements AuthDatasource {
       await user.save();
 
       return UserMapper.userEntityFromObject(user);
+    } catch (error) {
+      if (error instanceof CustomError) {
+        throw error;
+      }
+      throw CustomError.InternalServerError();
+    }
+  }
+
+  async login(loginUserDto: LoginUserDto): Promise<UserEntity> {
+    const { email, password } = loginUserDto;
+
+    try {
+      const userExist = await UserModel.findOne({ email });
+      if (!userExist) throw CustomError.BadRequest('User not found');
+
+      const isPasswordCorrect = this.comparePassword(
+        password,
+        userExist.password,
+      );
+      if (!isPasswordCorrect)
+        throw CustomError.Unauthorized('Invalid credentials');
+
+      return UserMapper.userEntityFromObject(userExist);
     } catch (error) {
       if (error instanceof CustomError) {
         throw error;
